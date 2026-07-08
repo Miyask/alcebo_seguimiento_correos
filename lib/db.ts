@@ -1,24 +1,4 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-
-// En Vercel, la raíz es de solo lectura. Usamos /tmp/ para poder escribir en SQLite de forma temporal.
-const dbPath = process.env.NODE_ENV === 'production' && process.env.VERCEL
-  ? '/tmp/database.sqlite'
-  : path.join(process.cwd(), 'database.sqlite');
-
-const db = new Database(dbPath);
-
-// Inicializar la tabla de presupuestos si no existe
-db.exec(`
-  CREATE TABLE IF NOT EXISTS presupuestos (
-    id TEXT PRIMARY KEY,
-    cliente TEXT NOT NULL,
-    email_cliente TEXT NOT NULL,
-    fecha_creacion TEXT NOT NULL,
-    estado TEXT DEFAULT 'pendiente', -- 'pendiente' | 'enviado' | 'recordatorio_enviado'
-    enlace_documento TEXT NOT NULL
-  );
-`);
+import { db } from '@vercel/postgres';
 
 export interface Presupuesto {
   id: string;
@@ -29,32 +9,69 @@ export interface Presupuesto {
   enlace_documento: string;
 }
 
-// 1. Guardar nuevo presupuesto
-export function crearPresupuesto(p: Omit<Presupuesto, 'fecha_creacion' | 'estado'>) {
-  const stmt = db.prepare(`
-    INSERT OR REPLACE INTO presupuestos (id, cliente, email_cliente, fecha_creacion, estado, enlace_documento)
-    VALUES (?, ?, ?, ?, 'pendiente', ?)
-  `);
+let initialized = false;
+
+// Inicializa las tablas automáticamente en la nube de Vercel si no existen
+async function checkInit() {
+  if (initialized) return;
+  try {
+    const client = await db.connect();
+    await client.sql`
+      CREATE TABLE IF NOT EXISTS presupuestos (
+        id TEXT PRIMARY KEY,
+        cliente TEXT NOT NULL,
+        email_cliente TEXT NOT NULL,
+        fecha_creacion TEXT NOT NULL,
+        estado TEXT DEFAULT 'pendiente',
+        enlace_documento TEXT NOT NULL
+      );
+    `;
+    initialized = true;
+  } catch (error) {
+    console.error('Error al inicializar las tablas de Postgres:', error);
+  }
+}
+
+// 1. Guardar o actualizar presupuesto
+export async function crearPresupuesto(p: Omit<Presupuesto, 'fecha_creacion' | 'estado'>) {
+  await checkInit();
+  const client = await db.connect();
   const fecha = new Date().toISOString();
-  stmt.run(p.id, p.cliente, p.email_cliente, fecha, p.enlace_documento);
+  await client.sql`
+    INSERT INTO presupuestos (id, cliente, email_cliente, fecha_creacion, estado, enlace_documento)
+    VALUES (${p.id}, ${p.cliente}, ${p.email_cliente}, ${fecha}, 'pendiente', ${p.enlace_documento})
+    ON CONFLICT (id) DO UPDATE SET
+      cliente = EXCLUDED.cliente,
+      email_cliente = EXCLUDED.email_cliente,
+      enlace_documento = EXCLUDED.enlace_documento;
+  `;
 }
 
-// 2. Obtener lista completa (ordenada por fecha de llegada)
-export function obtenerTodos(): Presupuesto[] {
-  const stmt = db.prepare('SELECT * FROM presupuestos ORDER BY fecha_creacion DESC');
-  return stmt.all() as Presupuesto[];
+// 2. Obtener lista completa para la interfaz
+export async function obtenerTodos(): Promise<Presupuesto[]> {
+  await checkInit();
+  const client = await db.connect();
+  const { rows } = await client.sql`
+    SELECT * FROM presupuestos ORDER BY fecha_creacion DESC
+  `;
+  return rows as Presupuesto[];
 }
 
-// 3. Actualizar estado
-export function actualizarEstado(id: string, nuevoEstado: 'pendiente' | 'enviado' | 'recordatorio_enviado') {
-  const stmt = db.prepare('UPDATE presupuestos SET estado = ? WHERE id = ?');
-  stmt.run(nuevoEstado, id);
+// 3. Actualizar estado (ej: marcar como enviado)
+export async function actualizarEstado(id: string, nuevoEstado: 'pendiente' | 'enviado' | 'recordatorio_enviado') {
+  await checkInit();
+  const client = await db.connect();
+  await client.sql`
+    UPDATE presupuestos SET estado = ${nuevoEstado} WHERE id = ${id}
+  `;
 }
 
-// 4. Obtener pendientes de envío
-export function obtenerPendientes(): Presupuesto[] {
-  const stmt = db.prepare("SELECT * FROM presupuestos WHERE estado = 'pendiente'");
-  return stmt.all() as Presupuesto[];
+// 4. Obtener presupuestos de hace 48 horas pendientes
+export async function obtenerPendientes(): Promise<Presupuesto[]> {
+  await checkInit();
+  const client = await db.connect();
+  const { rows } = await client.sql`
+    SELECT * FROM presupuestos WHERE estado = 'pendiente'
+  `;
+  return rows as Presupuesto[];
 }
-
-export default db;

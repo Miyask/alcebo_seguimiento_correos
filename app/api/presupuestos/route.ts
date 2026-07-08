@@ -4,7 +4,7 @@ import { crearPresupuesto, obtenerTodos } from '@/lib/db';
 // GET /api/presupuestos - Devuelve todos los presupuestos para el frontend
 export async function GET() {
   try {
-    const list = obtenerTodos();
+    const list = await obtenerTodos();
     return NextResponse.json(list);
   } catch (error: any) {
     console.error('[GET /api/presupuestos ERROR]:', error);
@@ -15,7 +15,7 @@ export async function GET() {
   }
 }
 
-// POST /api/presupuestos - Recibe JSON desde la App 1 y lo registra en SQLite
+// POST /api/presupuestos - Recibe JSON y lo registra en Postgres
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       );
     }
 
-    crearPresupuesto({ id, cliente, email_cliente, enlace_documento });
+    await crearPresupuesto({ id, cliente, email_cliente, enlace_documento });
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
     console.error('[POST /api/presupuestos ERROR]:', error);

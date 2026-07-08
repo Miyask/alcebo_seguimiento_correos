@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
-import db, { actualizarEstado } from '@/lib/db';
+import { db } from '@vercel/postgres';
+import { actualizarEstado } from '@/lib/db';
 import { sendFollowUpEmail } from '@/lib/email';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const id = params.id;
+    const client = await db.connect();
     
-    // Obtener detalles del presupuesto desde SQLite
-    const budget = db.prepare('SELECT * FROM presupuestos WHERE id = ?').get(id) as any;
+    // Obtener detalles del presupuesto desde Postgres
+    const { rows } = await client.sql`SELECT * FROM presupuestos WHERE id = ${id}`;
+    const budget = rows[0] as any;
 
     if (!budget) {
       return NextResponse.json({ error: 'Presupuesto no encontrado.' }, { status: 404 });
@@ -17,7 +20,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     await sendFollowUpEmail(budget.email_cliente, budget.cliente, budget.enlace_documento);
 
     // Actualizar estado a 'recordatorio_enviado'
-    actualizarEstado(id, 'recordatorio_enviado');
+    await actualizarEstado(id, 'recordatorio_enviado');
 
     return NextResponse.json({ success: true, message: 'Correo de recordatorio enviado correctamente.' });
   } catch (error: any) {

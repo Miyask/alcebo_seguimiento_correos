@@ -11,7 +11,7 @@ export async function GET(req: Request) {
 
   try {
     console.log('[CRON] Iniciando comprobación de recordatorios de 48 horas...');
-    const pendientes = obtenerPendientes();
+    const pendientes = await obtenerPendientes();
     const ahora = Date.now();
     const limiteHoras = 48;
     const limiteMs = limiteHoras * 60 * 60 * 1000;
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         console.log(`[CRON] Enviando recordatorio para Presupuesto ${p.id} a ${p.email_cliente}`);
         try {
           await sendFollowUpEmail(p.email_cliente, p.cliente, p.enlace_documento);
-          actualizarEstado(p.id, 'recordatorio_enviado');
+          await actualizarEstado(p.id, 'recordatorio_enviado');
           totalEnviados++;
         } catch (err: any) {
           console.error(`[CRON ERROR] Error con Presupuesto ${p.id}: ${err.message}`);
