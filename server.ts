@@ -134,15 +134,15 @@ async function initDb() {
   } else {
     console.log('[DB] Conectando a SQLite local de forma dinámica...');
     try {
-      // Carga dinámica para que Vercel no intente importar SQLite ni compile sus binarios nativos
-      const sqlite3 = await import('sqlite3');
-      const { open } = await import('sqlite');
+      // Uso de eval('require') para evitar que bundlers como Webpack o Esbuild intenten empaquetar sqlite3
+      const sqlite3Module = eval('require')('sqlite3');
+      const sqliteModule = eval('require')('sqlite');
       
       const dbPath = path.join(process.cwd(), 'database.sqlite');
       
-      const sqliteInstance = await open({
+      const sqliteInstance = await sqliteModule.open({
         filename: dbPath,
-        driver: sqlite3.default.Database,
+        driver: sqlite3Module.Database,
       });
 
       await sqliteInstance.exec(`
