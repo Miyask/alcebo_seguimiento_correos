@@ -1,23 +1,20 @@
 import { NextResponse } from 'next/server';
-import { db } from '@vercel/postgres';
-import { actualizarEstado } from '@/lib/db';
+import { obtenerPorId, actualizarEstado } from '@/lib/db';
 import { sendFollowUpEmail } from '@/lib/email';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const id = params.id;
-    const client = await db.connect();
     
-    // Obtener detalles del presupuesto desde Postgres
-    const { rows } = await client.sql`SELECT * FROM presupuestos WHERE id = ${id}`;
-    const budget = rows[0] as any;
+    // Obtener detalles del presupuesto de forma compatible (Postgres o SQLite)
+    const budget = await obtenerPorId(id);
 
     if (!budget) {
       return NextResponse.json({ error: 'Presupuesto no encontrado.' }, { status: 404 });
     }
 
     // Forzar el envío manual inmediato
-    await sendFollowUpEmail(budget.email_cliente, budget.cliente, budget.enlace_documento);
+    await sendFollowUpEmail(budget.email_cliente, budget.cliente, budget.enlace_documento, budget.id);
 
     // Actualizar estado a 'recordatorio_enviado'
     await actualizarEstado(id, 'recordatorio_enviado');
