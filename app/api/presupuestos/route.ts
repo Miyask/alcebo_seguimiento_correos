@@ -28,7 +28,9 @@ export async function POST(req: Request) {
       );
     }
 
+    // Guardar en base de datos (con estado 'pendiente', listo para que pasen las 48h)
     await crearPresupuesto({ id, cliente, email_cliente, enlace_documento });
+
     return NextResponse.json({ success: true, id });
   } catch (error: any) {
     console.error('[POST /api/presupuestos ERROR]:', error);

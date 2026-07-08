@@ -7,17 +7,15 @@ export interface Presupuesto {
   cliente: string;
   email_cliente: string;
   fecha_creacion: string;
-  estado: 'pendiente' | 'enviado' | 'recordatorio_enviado';
+  estado: 'pendiente' | 'recordatorio_enviado' | 'completado';
   enlace_documento: string;
 }
 
-// Detección automática: Si existe la variable POSTGRES_URL, usamos la nube. Si no, usamos SQLite local.
 const usePostgres = !!process.env.POSTGRES_URL;
 
 let sqliteDb: any = null;
 
 if (!usePostgres) {
-  // Inicialización de SQLite local
   const dbPath = path.join(process.cwd(), 'database.sqlite');
   sqliteDb = new Database(dbPath);
   sqliteDb.exec(`
@@ -26,8 +24,13 @@ if (!usePostgres) {
       cliente TEXT NOT NULL,
       email_cliente TEXT NOT NULL,
       fecha_creacion TEXT NOT NULL,
-      estado TEXT DEFAULT 'pendiente',
+      estado TEXT DEFAULT 'pendiente', -- 'pendiente' | 'recordatorio_enviado' | 'completado'
       enlace_documento TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS configuracion (
+      key TEXT PRIMARY KEY,
+      value TEXT
     );
   `);
 }
@@ -47,18 +50,69 @@ async function checkPgInit() {
         enlace_documento TEXT NOT NULL
       );
     `;
+    await client.sql`
+      CREATE TABLE IF NOT EXISTS configuracion (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `;
     pgInitialized = true;
   } catch (error) {
-    console.error('Error al inicializar Postgres en la nube:', error);
+    console.error('Error al inicializar Postgres:', error);
   }
 }
 
-// 1. Guardar o actualizar presupuesto
+// Inicializar configuración por defecto (Solo el correo de recordatorio de pago)
+async function checkDefaultTemplates() {
+  const config = await obtenerConfiguracion();
+  if (Object.keys(config).length === 0) {
+    const defaultTemplate = [
+      'Hola {cliente},',
+      '',
+      'Le escribimos para recordarle el pago del presupuesto solicitado con el número {id} enviado hace dos días.',
+      '',
+      'Si ya ha realizado la transferencia, por favor ignore este mensaje. En caso contrario, puede descargar el presupuesto y consultar los datos bancarios haciendo clic en el siguiente enlace:',
+      '',
+      '{enlace_documento}',
+      '',
+      'Quedamos a su entera disposición.',
+      '',
+      'Un cordial saludo,',
+      'Alcebo Control de Plagas'
+    ].join('\n');
+
+    const defaults = [
+      { key: 'smtp_host', value: 'smtp.gmail.com' },
+      { key: 'smtp_port', value: '587' },
+      { key: 'smtp_secure', value: 'false' },
+      { key: 'smtp_user', value: '' },
+      { key: 'smtp_pass', value: '' },
+      { key: 'smtp_from', value: '' },
+      { key: 'email_subject', value: 'Recordatorio de pago - Presupuesto {id} - Alcebo' },
+      { key: 'email_body', value: defaultTemplate },
+      { key: 'delay_hours', value: '48' }
+    ];
+
+    if (usePostgres) {
+      const client = await vercelDb.connect();
+      for (const item of defaults) {
+        await client.sql`INSERT INTO configuracion (key, value) VALUES (${item.key}, ${item.value}) ON CONFLICT (key) DO NOTHING;`;
+      }
+    } else {
+      const insert = sqliteDb.prepare('INSERT OR IGNORE INTO configuracion (key, value) VALUES (?, ?)');
+      for (const item of defaults) {
+        insert.run(item.key, item.value);
+      }
+    }
+  }
+}
+
+// 1. Guardar presupuesto
 export async function crearPresupuesto(p: Omit<Presupuesto, 'fecha_creacion' | 'estado'>) {
   const fecha = new Date().toISOString();
-  
   if (usePostgres) {
     await checkPgInit();
+    await checkDefaultTemplates();
     const client = await vercelDb.connect();
     await client.sql`
       INSERT INTO presupuestos (id, cliente, email_cliente, fecha_creacion, estado, enlace_documento)
@@ -69,6 +123,7 @@ export async function crearPresupuesto(p: Omit<Presupuesto, 'fecha_creacion' | '
         enlace_documento = EXCLUDED.enlace_documento;
     `;
   } else {
+    await checkDefaultTemplates();
     const stmt = sqliteDb.prepare(`
       INSERT OR REPLACE INTO presupuestos (id, cliente, email_cliente, fecha_creacion, estado, enlace_documento)
       VALUES (?, ?, ?, ?, 'pendiente', ?)
@@ -108,7 +163,7 @@ export async function obtenerPorId(id: string): Promise<Presupuesto | null> {
 }
 
 // 4. Actualizar estado
-export async function actualizarEstado(id: string, nuevoEstado: 'pendiente' | 'enviado' | 'recordatorio_enviado') {
+export async function actualizarEstado(id: string, nuevoEstado: 'pendiente' | 'recordatorio_enviado' | 'completado') {
   if (usePostgres) {
     await checkPgInit();
     const client = await vercelDb.connect();
@@ -121,7 +176,7 @@ export async function actualizarEstado(id: string, nuevoEstado: 'pendiente' | 'e
   }
 }
 
-// 5. Obtener pendientes
+// 5. Obtener pendientes de recordatorio (estado = 'pendiente')
 export async function obtenerPendientes(): Promise<Presupuesto[]> {
   if (usePostgres) {
     await checkPgInit();
@@ -135,3 +190,35 @@ export async function obtenerPendientes(): Promise<Presupuesto[]> {
     return stmt.all() as Presupuesto[];
   }
 }
+
+// Configuración
+export async function obtenerConfiguracion(): Promise<Record<string, string>> {
+  if (usePostgres) {
+    await checkPgInit();
+    const client = await vercelDb.connect();
+    const { rows } = await client.sql`SELECT key, value FROM configuracion`;
+    const config: Record<string, string> = {};
+    rows.forEach(r => { config[r.key] = r.value || ''; });
+    return config;
+  } else {
+    const rows = sqliteDb.prepare('SELECT key, value FROM configuracion').all() as { key: string; value: string }[];
+    const config: Record<string, string> = {};
+    rows.forEach(r => { config[r.key] = r.value || ''; });
+    return config;
+  }
+}
+
+export async function guardarConfiguracion(key: string, value: string) {
+  if (usePostgres) {
+    await checkPgInit();
+    const client = await vercelDb.connect();
+    await client.sql`
+      INSERT INTO configuracion (key, value) VALUES (${key}, ${value})
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+    `;
+  } else {
+    sqliteDb.prepare('INSERT OR REPLACE INTO configuracion (key, value) VALUES (?, ?)').run(key, value);
+  }
+}
+
+export default sqliteDb;

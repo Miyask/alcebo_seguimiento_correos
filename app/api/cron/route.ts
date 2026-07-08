@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    console.log('[CRON] Iniciando comprobación de recordatorios de 48 horas...');
+    console.log('[CRON] Iniciando comprobación de recordatorios de pago de 48 horas...');
     const pendientes = await obtenerPendientes();
     const ahora = Date.now();
     const limiteHoras = 48;
@@ -22,10 +22,11 @@ export async function GET(req: Request) {
       const creacion = new Date(p.fecha_creacion).getTime();
       const diferencia = ahora - creacion;
 
+      // Si han pasado 48 horas desde que se registró (que es cuando enviaron el presupuesto por su cuenta)
       if (diferencia >= limiteMs) {
-        console.log(`[CRON] Enviando recordatorio para Presupuesto ${p.id} a ${p.email_cliente}`);
+        console.log(`[CRON] Enviando Recordatorio de Pago para Presupuesto ${p.id} a ${p.email_cliente}`);
         try {
-          await sendFollowUpEmail(p.email_cliente, p.cliente, p.enlace_documento);
+          await sendFollowUpEmail(p.email_cliente, p.cliente, p.enlace_documento, p.id);
           await actualizarEstado(p.id, 'recordatorio_enviado');
           totalEnviados++;
         } catch (err: any) {

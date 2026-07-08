@@ -13,13 +13,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Presupuesto no encontrado.' }, { status: 404 });
     }
 
-    // Forzar el envío manual inmediato
+    // Forzar el envío manual inmediato del recordatorio de pago
     await sendFollowUpEmail(budget.email_cliente, budget.cliente, budget.enlace_documento, budget.id);
 
     // Actualizar estado a 'recordatorio_enviado'
     await actualizarEstado(id, 'recordatorio_enviado');
 
-    return NextResponse.json({ success: true, message: 'Correo de recordatorio enviado correctamente.' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Correo de recordatorio enviado correctamente.' 
+    });
   } catch (error: any) {
     console.error(`[POST /api/reenviar/${params.id} ERROR]:`, error);
     return NextResponse.json(
