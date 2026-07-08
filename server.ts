@@ -4,12 +4,26 @@ import fs from 'fs';
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
 import { db as vercelDb } from '@vercel/postgres';
+import { createRequire } from 'module';
 
 const app = express();
 const PORT = 3001;
 
 // En Vercel siempre forzamos el uso de Postgres (SQLite no es compatible con funciones serverless)
 const usePostgres = !!process.env.POSTGRES_URL || !!process.env.VERCEL;
+
+// Helper para importar módulos CommonJS de forma segura tanto en ESM (Vercel) como en CJS (local)
+const safeRequire = (moduleName: string) => {
+  try {
+    // Si require está disponible de forma global, lo usamos (CommonJS)
+    if (typeof require !== 'undefined') {
+      return require(moduleName);
+    }
+  } catch (e) {}
+  // Si no está disponible, creamos un require local para entorno de Módulos ES (ESM)
+  const requireInstance = createRequire(import.meta.url);
+  return requireInstance(moduleName);
+};
 
 // Interface unificada para interactuar con la base de datos
 let db: {
@@ -134,9 +148,9 @@ async function initDb() {
   } else {
     console.log('[DB] Conectando a SQLite local de forma dinámica...');
     try {
-      // Uso de eval('require') para evitar que bundlers como Webpack o Esbuild intenten empaquetar sqlite3
-      const sqlite3Module = eval('require')('sqlite3');
-      const sqliteModule = eval('require')('sqlite');
+      // Uso de safeRequire para resolver sqlite3 y sqlite de forma aislada
+      const sqlite3Module = safeRequire('sqlite3');
+      const sqliteModule = safeRequire('sqlite');
       
       const dbPath = path.join(process.cwd(), 'database.sqlite');
       
