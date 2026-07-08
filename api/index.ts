@@ -220,7 +220,7 @@ app.use(express.json());
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -394,6 +394,17 @@ app.get('/api/correos-enviados', async (req, res) => {
   } catch (error: any) {
     console.error(error);
     return res.status(500).json({ error: 'Error al consultar correos enviados.', details: error.message });
+  }
+});
+
+app.delete('/api/correos-enviados/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await vercelDb.query('DELETE FROM correos_enviados WHERE id = $1', [id]);
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error al eliminar correo del historial.', details: error.message });
   }
 });
 

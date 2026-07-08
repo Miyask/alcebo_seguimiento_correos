@@ -43,6 +43,20 @@ export default function DashboardView({ presupuestos, onRefresh, onOpenConfig }:
     fetchSentEmails(); // Refresh sent mails list immediately
   };
 
+  const handleDeleteEmail = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (confirm('¿Deseas eliminar este registro de correo enviado?')) {
+      try {
+        const res = await fetch(`/api/correos-enviados/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          triggerToast('🗑️ Registro de correo eliminado.');
+        }
+      } catch (err) {
+        console.error('Error deleting sent email:', err);
+      }
+    }
+  };
+
   // Action: Mark as completed (Hecho)
   const handleMarkAsDone = async (id: string) => {
     try {
@@ -285,9 +299,18 @@ export default function DashboardView({ presupuestos, onRefresh, onOpenConfig }:
                 <div className="font-black text-xs text-[#006491] truncate">
                   Asunto: {mail.asunto}
                 </div>
-                <span className="text-[10px] bg-sky-50 text-[#009FE3] font-bold px-2 py-0.5 rounded border border-sky-100 uppercase tracking-wider block w-max">
-                  Ver Mensaje
-                </span>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-[10px] bg-sky-50 text-[#009FE3] font-bold px-2 py-0.5 rounded border border-sky-100 uppercase tracking-wider block w-max">
+                    Ver Mensaje
+                  </span>
+                  <button
+                    onClick={(e) => handleDeleteEmail(e, mail.id)}
+                    className="text-xs hover:bg-rose-550/10 text-rose-600 hover:text-rose-800 px-2 py-1 rounded-lg border border-transparent hover:border-rose-200 cursor-pointer active:scale-90 transition-all font-bold flex items-center gap-1 select-none"
+                    title="Eliminar este correo de la bandeja"
+                  >
+                    🗑️ Borrar
+                  </button>
+                </div>
               </div>
             ))}
           </div>
