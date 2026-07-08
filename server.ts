@@ -8,7 +8,9 @@ import { db as vercelDb } from '@vercel/postgres';
 
 const app = express();
 const PORT = 3001;
-const usePostgres = !!process.env.POSTGRES_URL;
+
+// En Vercel siempre forzamos el uso de Postgres (SQLite no es compatible con funciones serverless)
+const usePostgres = !!process.env.POSTGRES_URL || !!process.env.VERCEL;
 
 // Interface unificada para interactuar con la base de datos
 let db: {
@@ -24,6 +26,13 @@ async function initDb() {
   if (dbInitialized) return;
 
   if (usePostgres) {
+    // Si estamos en Vercel pero el usuario no ha conectado la base de datos Postgres todavía
+    if (!process.env.POSTGRES_URL) {
+      throw new Error(
+        'La base de datos Vercel Postgres no está conectada. Por favor, ve al panel de tu proyecto en Vercel, entra en la pestaña "Storage" (arriba), crea una base de datos de Postgres y haz clic en "Connect" para vincularla a este proyecto.'
+      );
+    }
+
     console.log('[DB] Conectando a Vercel Postgres...');
     try {
       const client = await vercelDb.connect();
@@ -126,12 +135,11 @@ async function initDb() {
   } else {
     console.log('[DB] Conectando a SQLite local de forma dinámica...');
     try {
-      // Carga dinámica de sqlite3 y sqlite para evitar cargarlas en Vercel
+      // Carga dinámica para que Vercel no intente importar SQLite ni compile sus binarios nativos
       const sqlite3 = await import('sqlite3');
       const { open } = await import('sqlite');
       
-      const dbDir = process.env.VERCEL ? '/tmp' : process.cwd();
-      const dbPath = path.join(dbDir, 'database.sqlite');
+      const dbPath = path.join(process.cwd(), 'database.sqlite');
       
       const sqliteInstance = await open({
         filename: dbPath,
@@ -371,7 +379,7 @@ app.use(async (req, res, next) => {
     await initDb();
     next();
   } catch (err: any) {
-    res.status(500).json({ error: 'Fallo al inicializar base de datos', details: err.message });
+    res.status(500).json({ error: 'Base de datos no disponible', details: err.message });
   }
 });
 
