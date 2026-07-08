@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
-import { db as vercelDb } from '@vercel/postgres';
 import { createRequire } from 'module';
 
 const app = express();
@@ -48,7 +47,10 @@ async function initDb() {
 
     console.log('[DB] Conectando a Vercel Postgres...');
     try {
-      const client = await vercelDb.connect();
+      // Importar dinámicamente @vercel/postgres para evitar errores de conexión al cargar la clase
+      const { db: pgDb } = await import('@vercel/postgres');
+      
+      const client = await pgDb.connect();
       
       // Crear tablas si no existen en Postgres
       await client.sql`
@@ -122,20 +124,20 @@ async function initDb() {
       db = {
         all: async (sql, params = []) => {
           const pgSql = convertSql(sql);
-          const { rows } = await vercelDb.query(pgSql, params);
+          const { rows } = await pgDb.query(pgSql, params);
           return rows;
         },
         run: async (sql, params = []) => {
           const pgSql = convertSql(sql);
-          return vercelDb.query(pgSql, params);
+          return pgDb.query(pgSql, params);
         },
         get: async (sql, params = []) => {
           const pgSql = convertSql(sql);
-          const { rows } = await vercelDb.query(pgSql, params);
+          const { rows } = await pgDb.query(pgSql, params);
           return rows[0] || null;
         },
         exec: async (sql) => {
-          return vercelDb.query(sql);
+          return pgDb.query(sql);
         }
       };
 
