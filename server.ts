@@ -2,8 +2,6 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
 import { db as vercelDb } from '@vercel/postgres';
@@ -12,7 +10,7 @@ const app = express();
 const PORT = 3001;
 const usePostgres = !!process.env.POSTGRES_URL;
 
-// Unified database interface (switches between Vercel Postgres and local SQLite)
+// Interface unificada para interactuar con la base de datos
 let db: {
   all: (sql: string, params?: any[]) => Promise<any[]>;
   run: (sql: string, params?: any[]) => Promise<any>;
@@ -30,7 +28,7 @@ async function initDb() {
     try {
       const client = await vercelDb.connect();
       
-      // Crear tablas si no existen
+      // Crear tablas si no existen en Postgres
       await client.sql`
         CREATE TABLE IF NOT EXISTS presupuestos (
           id VARCHAR(255) PRIMARY KEY,
@@ -71,12 +69,10 @@ async function initDb() {
         );
       `;
 
-      // Helper para convertir queries de SQLite (?) a Postgres ($1, $2...) y mapear REPLACE
       const convertSql = (sql: string) => {
         let index = 1;
         let pgSql = sql.replace(/\?/g, () => `$${index++}`);
         
-        // Mapear el INSERT OR REPLACE de SQLite al INSERT ... ON CONFLICT de Postgres
         if (pgSql.toUpperCase().includes('INSERT OR REPLACE INTO PRESUPUESTOS')) {
           pgSql = `
             INSERT INTO presupuestos 
@@ -125,14 +121,21 @@ async function initDb() {
       console.log('[DB] Vercel Postgres inicializada con éxito.');
     } catch (err) {
       console.error('[DB ERROR] Error al conectar con Postgres:', err);
+      throw err;
     }
   } else {
-    console.log('[DB] Conectando a SQLite local...');
+    console.log('[DB] Conectando a SQLite local de forma dinámica...');
     try {
-      const dbPath = path.join(process.cwd(), 'database.sqlite');
+      // Carga dinámica de sqlite3 y sqlite para evitar cargarlas en Vercel
+      const sqlite3 = await import('sqlite3');
+      const { open } = await import('sqlite');
+      
+      const dbDir = process.env.VERCEL ? '/tmp' : process.cwd();
+      const dbPath = path.join(dbDir, 'database.sqlite');
+      
       const sqliteInstance = await open({
         filename: dbPath,
-        driver: sqlite3.Database,
+        driver: sqlite3.default.Database,
       });
 
       await sqliteInstance.exec(`
@@ -183,6 +186,7 @@ async function initDb() {
       console.log('[DB] SQLite local inicializada con éxito.');
     } catch (err) {
       console.error('[DB ERROR] Error al inicializar SQLite:', err);
+      throw err;
     }
   }
 
@@ -257,7 +261,7 @@ async function logSentEmail(destinatario: string, asunto: string, cuerpo: string
   }
 }
 
-// Nodemailer para enviar el recordatorio (soporta BCC para copia oculta a la oficina)
+// Nodemailer para enviar el recordatorio
 async function sendFollowUpEmail(budget: any, config: Record<string, string>): Promise<{ sentReal: boolean; details: string }> {
   const host = config['smtp_host'] || 'smtp.gmail.com';
   const port = parseInt(config['smtp_port'] || '587', 10);
@@ -336,7 +340,7 @@ async function sendFollowUpEmail(budget: any, config: Record<string, string>): P
   await transporter.sendMail({
     from: `Alcebo Control de Plagas <${from}>`,
     to: budget.email,
-    bcc: user, // ✉️ Copia oculta automática a la oficina
+    bcc: user, // Copia oculta automática a la oficina
     subject,
     html,
   });
@@ -350,7 +354,7 @@ async function sendFollowUpEmail(budget: any, config: Record<string, string>): P
 // -------------------------------------------------------------
 app.use(express.json());
 
-// CORS habilitado para soportar conexiones cruzadas en local (3000 -> 3001) y en Vercel
+// CORS habilitado
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
@@ -611,7 +615,7 @@ app.get('/api/system-logs', async (req, res) => {
   }
 });
 
-// Ruta GET /api/cron para que sea llamada diariamente por Vercel
+// GET /api/cron
 app.get('/api/cron', async (req, res) => {
   try {
     console.log('[CRON] Iniciando comprobación de recordatorios de pago de 48 horas...');
@@ -665,7 +669,7 @@ app.get('/api/cron', async (req, res) => {
   }
 });
 
-// Planificador local de comprobación automática (se ejecuta en segundo plano solo en desarrollo local)
+// Planificador local (solo en desarrollo)
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   cron.schedule('* * * * *', async () => {
     try {
