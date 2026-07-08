@@ -1,6 +1,21 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
+  "builds": [
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "api/index.ts" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/$1" }
   ],
   "crons": [
     {
