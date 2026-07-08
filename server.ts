@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
 import { db as vercelDb } from '@vercel/postgres';
@@ -732,6 +731,7 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
 // Carga del frontend (Vite)
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
