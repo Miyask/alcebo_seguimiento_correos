@@ -266,10 +266,15 @@ app.post('/api/presupuestos', async (req, res) => {
   try {
     const { id, cliente, email, fecha, documento, monto } = req.body;
 
-    if (!id || !cliente || !email || !fecha || !documento) {
-      return res.status(400).json({ error: 'Faltan campos obligatorios (id, cliente, email, fecha, documento).' });
+    if (!id || !email) {
+      return res.status(400).json({ error: 'Faltan campos obligatorios (id, email).' });
     }
 
+    // Tolerancia para campos vacíos
+    const cleanCliente = cliente && cliente.trim() !== '' ? cliente : 'Cliente sin nombre';
+    const cleanDocumento = documento && documento.trim() !== '' ? documento : 'Servicio Técnico';
+    const cleanFecha = fecha && fecha.trim() !== '' ? fecha : new Date().toISOString().split('T')[0];
+    const cleanMonto = parseFloat(monto) || 0;
     const fechaCreacion = new Date().toISOString();
     
     await vercelDb.query(
@@ -285,10 +290,10 @@ app.post('/api/presupuestos', async (req, res) => {
          estado = EXCLUDED.estado,
          fecha_creacion = EXCLUDED.fecha_creacion,
          estado_visual = EXCLUDED.estado_visual`,
-      [id, cliente, email, fecha, documento, parseFloat(monto) || 0, fechaCreacion]
+      [id, cleanCliente, email, cleanFecha, cleanDocumento, cleanMonto, fechaCreacion]
     );
 
-    await logSystemEvent('db_recibido', `Presupuesto recibido: ID ${id}, Cliente: ${cliente}, Email: ${email}`);
+    await logSystemEvent('db_recibido', `Presupuesto recibido: ID ${id}, Cliente: ${cleanCliente}, Email: ${email}`);
 
     return res.status(200).json({ success: true, id });
   } catch (error: any) {
