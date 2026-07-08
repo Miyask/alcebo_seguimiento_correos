@@ -378,7 +378,7 @@ app.use(async (req, res, next) => {
     await initDb();
     next();
   } catch (err: any) {
-    res.status(500).json({ error: 'Base de datos no disponible', details: err.message });
+    res.status(200).json({ error: 'Base de datos no disponible', details: err.message });
   }
 });
 
