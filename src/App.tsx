@@ -69,64 +69,66 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-[#1A1A1A] font-sans flex flex-col antialiased">
       
       {/* Top Header Bar */}
-      <header className="bg-white border-b-4 border-slate-200 px-6 md:px-10 py-5 flex justify-between items-center sticky top-0 z-45 shadow-sm">
-        <div className="flex items-center gap-4">
-          <CompanyLogo height={44} />
-          <span className="h-8 w-[2px] bg-slate-200 hidden sm:inline-block"></span>
-          <h1 className="font-black text-[#1A1A1A] text-xl tracking-wide hidden sm:inline-block uppercase">
+      <header className="bg-white border-b border-slate-200 px-6 md:px-10 py-4 flex justify-between items-center sticky top-0 z-45 shadow-xs">
+        <div className="flex items-center gap-3">
+          <CompanyLogo height={36} />
+          <span className="h-6 w-[1px] bg-slate-200 hidden sm:inline-block"></span>
+          <h1 className="font-extrabold text-[#1A1A1A] text-sm tracking-wider hidden sm:inline-block uppercase">
             Control de Presupuestos
           </h1>
         </div>
         
         {/* Prominent Onboarding / Config Button for Boss */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setIsConfigOpen(true)}
-            className={`h-[52px] px-6 text-white font-black rounded-2xl text-base active:scale-95 transition-all cursor-pointer flex items-center gap-2.5 shadow-md ${
+            className={`h-9 px-4 text-white font-bold rounded-xl text-xs active:scale-95 transition-all cursor-pointer flex items-center gap-2 shadow-xs ${
               !isEmailConnected 
-                ? 'bg-amber-500 hover:bg-amber-600 animate-pulse border-2 border-amber-600' 
+                ? 'bg-amber-500 hover:bg-amber-600 animate-pulse border border-amber-600' 
                 : 'bg-[#009FE3] hover:bg-[#0084c2]'
             }`}
           >
-            <span className="material-symbols-outlined text-xl">settings</span>
-            <span>{isEmailConnected ? '⚙️ CONFIGURACIÓN DE CORREO' : '🔑 CONECTAR MI CORREO'}</span>
+            <span className="material-symbols-outlined text-sm">settings</span>
+            <span>{isEmailConnected ? 'CONFIGURACIÓN DE CORREO' : 'CONECTAR MI CORREO'}</span>
             {!isEmailConnected && (
-              <span className="w-3 h-3 rounded-full bg-red-650 inline-block border border-white"></span>
+              <span className="w-2 h-2 rounded-full bg-rose-600 inline-block border border-white"></span>
             )}
           </button>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full pt-8 pb-16 px-6 md:px-10 max-w-7xl mx-auto">
+      <main className="flex-1 w-full pt-6 pb-12 px-6 md:px-10 max-w-7xl mx-auto">
         
         {/* Onboarding Banner: Visible if email is not connected yet */}
         {!isEmailConnected && (
-          <div className="bg-amber-50 border-4 border-amber-300 rounded-3xl p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-5 shadow-sm">
+          <div className="bg-amber-50 border border-amber-250 rounded-2xl p-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
             <div className="space-y-1">
-              <h2 className="text-xl font-black text-amber-900 flex items-center gap-2">
-                <span>👋</span> ¡Hola! Para empezar a enviar correos, conecta tu cuenta
+              <h2 className="text-sm font-black text-amber-900 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-amber-700 text-lg">error</span>
+                ¡Hola! Para empezar a enviar correos, conecta tu cuenta de correo
               </h2>
-              <p className="text-sm font-bold text-amber-800 leading-relaxed">
-                Necesitamos que conectes tu correo de la oficina para que los presupuestos se envíen en tu nombre. Es muy fácil, solo te llevará un minuto.
+              <p className="text-xs font-semibold text-amber-800 leading-normal">
+                Necesitamos que conectes tu correo de la oficina para que los presupuestos se envíen en tu nombre de forma automática.
               </p>
             </div>
             <button
               onClick={() => setIsConfigOpen(true)}
-              className="h-[50px] px-8 bg-amber-550 hover:bg-amber-600 text-white font-black rounded-xl text-base active:scale-95 transition-all cursor-pointer shrink-0 shadow-md flex items-center justify-center gap-2"
+              className="h-9 px-5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs active:scale-95 transition-all cursor-pointer shrink-0 shadow-xs flex items-center justify-center gap-1.5"
             >
-              <span>🔑</span> HACER CLIC AQUÍ AHORA
+              <span className="material-symbols-outlined text-sm">key</span>
+              Configurar Correo Ahora
             </button>
           </div>
         )}
 
         {loading && presupuestos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
-            <div className="w-12 h-12 border-4 border-[#009FE3] border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-slate-500 font-black text-lg">Cargando la lista...</p>
+          <div className="flex flex-col items-center justify-center min-h-[250px] space-y-3">
+            <div className="w-8 h-8 border-3 border-[#009FE3] border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-slate-400 font-bold text-xs">Cargando la lista...</p>
           </div>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-8">
             {/* List of budgets */}
             <DashboardView 
               presupuestos={presupuestos} 
@@ -136,12 +138,15 @@ export default function App() {
 
             {/* Hidden Simulator Panel for testing */}
             {isDebugMode && (
-              <div className="border-t-4 border-dashed border-slate-350 pt-8 mt-12 bg-white p-6 rounded-3xl border-3 border-slate-200">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-black text-slate-800">🛠️ Panel Técnico de Pruebas (Simulador)</h2>
+              <div className="border border-slate-200 pt-6 mt-8 bg-white p-5 rounded-2xl">
+                <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-3">
+                  <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[#009FE3]">construction</span>
+                    Panel Técnico de Pruebas (Simulador)
+                  </h2>
                   <button 
                     onClick={() => setIsDebugMode(false)}
-                    className="text-xs text-rose-600 hover:underline font-bold"
+                    className="text-[10px] text-rose-600 hover:underline font-bold"
                   >
                     Ocultar panel
                   </button>
@@ -154,14 +159,14 @@ export default function App() {
       </main>
 
       {/* Footer with hidden technical link */}
-      <footer className="border-t-4 border-slate-200 py-6 text-center text-xs text-slate-400 font-bold bg-white mt-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <footer className="border-t border-slate-200 py-4 text-center text-[10px] text-slate-400 font-bold bg-white mt-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-3">
         <p>© 2026 Alcebo Control de Plagas. Todos los derechos reservados.</p>
         
         <div className="flex gap-4">
           {/* Test tools toggle */}
           <button
             onClick={() => setIsDebugMode(!isDebugMode)}
-            className="text-[11px] text-slate-400 hover:text-slate-600 hover:underline font-bold cursor-pointer"
+            className="text-[10px] text-slate-400 hover:text-slate-600 hover:underline font-bold cursor-pointer"
           >
             🧪 Acceso Técnico (Simulador)
           </button>
@@ -171,38 +176,40 @@ export default function App() {
       {/* Configuration modal (SMTP & Templates) */}
       {isConfigOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-slate-50 rounded-3xl border-4 border-[#009FE3] shadow-2xl w-full max-w-4xl overflow-hidden my-8 animate-zoom-in">
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden my-8 animate-zoom-in">
             {/* Modal Header */}
-            <div className="bg-[#009FE3] px-6 py-5 text-white flex justify-between items-center">
-              <h3 className="font-extrabold text-lg flex items-center gap-2">
-                🔑 Conectar tu Cuenta de Correo
+            <div className="bg-slate-900 px-5 py-4 text-white flex justify-between items-center border-b border-slate-800">
+              <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[#009FE3]">key</span>
+                Configurar Cuenta de Correo SMTP
               </h3>
               <button 
                 onClick={() => {
                   setIsConfigOpen(false);
                   fetchConfig();
                 }}
-                className="text-white hover:text-sky-100 font-black text-base bg-white/10 px-4 py-2 rounded-xl cursor-pointer"
+                className="text-slate-400 hover:text-white font-semibold text-xs cursor-pointer flex items-center gap-0.5 bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700"
               >
-                CERRAR
+                <span className="material-symbols-outlined text-sm">close</span>
+                Cerrar
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="max-h-[calc(100vh-180px)] overflow-y-auto p-6 bg-slate-50">
+            <div className="max-h-[calc(100vh-180px)] overflow-y-auto p-5 bg-slate-50">
               <ConfigView />
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-white px-6 py-4.5 border-t border-slate-200 flex justify-end">
+            <div className="bg-white px-5 py-3.5 border-t border-slate-200 flex justify-end">
               <button
                 onClick={() => {
                   setIsConfigOpen(false);
                   fetchConfig();
                 }}
-                className="h-[50px] px-8 bg-slate-800 hover:bg-slate-900 text-white font-extrabold rounded-2xl text-base cursor-pointer active:scale-95 transition-all shadow-sm"
+                className="h-9 px-5 bg-slate-900 hover:bg-slate-950 text-white font-bold rounded-xl text-xs cursor-pointer active:scale-95 transition-all shadow-sm"
               >
-                CERRAR
+                Cerrar Configuración
               </button>
             </div>
           </div>

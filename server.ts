@@ -606,6 +606,18 @@ app.delete('/api/correos-enviados/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/presupuestos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.run('DELETE FROM presupuestos WHERE id = ?', [id]);
+    await logSystemEvent('db_eliminado', `Presupuesto ID ${id} eliminado del sistema.`);
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error al eliminar presupuesto.', details: error.message });
+  }
+});
+
 app.get('/api/config', async (req, res) => {
   try {
     const rows = await db.all('SELECT key, value FROM configuracion');
