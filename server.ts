@@ -534,6 +534,57 @@ app.post('/api/presupuestos/:id/reenviar', async (req, res) => {
   }
 });
 
+app.post('/api/presupuestos/:id/preparar-correo', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Obtener presupuesto
+    const budget = await db.get('SELECT * FROM presupuestos WHERE id = ?', [id]);
+    if (!budget) {
+      return res.status(404).json({ error: 'Presupuesto no encontrado.' });
+    }
+
+    // 2. Obtener configuración
+    const configRows = await db.all('SELECT key, value FROM configuracion');
+    const config: Record<string, string> = {};
+    configRows.forEach((row) => { config[row.key] = row.value || ''; });
+
+    const subjectTemplate = config['email_subject'] || 'Seguimiento del presupuesto {id} - Alcebo';
+    const plainBodyTemplate = config['email_body'] || '';
+
+    const subject = subjectTemplate
+      .replace(/{id}/g, budget.id)
+      .replace(/{cliente}/g, budget.cliente)
+      .replace(/{documento}/g, budget.documento || '');
+
+    const body = plainBodyTemplate
+      .replace(/{id}/g, budget.id)
+      .replace(/{cliente}/g, budget.cliente)
+      .replace(/{documento}/g, budget.documento || '');
+
+    // 3. Marcar como enviado
+    const timestamp = new Date().toISOString();
+    await db.run(
+      `UPDATE presupuestos 
+       SET email_enviado = 1, estado_visual = 'Enviado', fecha_seguimiento_enviado = ?, error_seguimiento = NULL 
+       WHERE id = ?`,
+      [timestamp, id]
+    );
+
+    await logSystemEvent('email_enviado', `Preparado reenvío manual (Gmail) para ID ${id}. Marcado como enviado.`);
+
+    return res.json({
+      success: true,
+      to: budget.email,
+      subject,
+      body
+    });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error al preparar el correo.', details: error.message });
+  }
+});
+
 app.get('/api/correos-enviados', async (req, res) => {
   try {
     const list = await db.all('SELECT * FROM correos_enviados ORDER BY id DESC LIMIT 50');

@@ -73,16 +73,21 @@ export default function DashboardView({ presupuestos, onRefresh, onOpenConfig }:
     }
   };
 
-  // Action: Send email now manually
+  // Action: Send email now manually (Opens Gmail compose)
   const handleSendEmailNow = async (id: string) => {
     setLoadingId(id);
     try {
-      const res = await fetch(`/api/presupuestos/${id}/reenviar`, { method: 'POST' });
+      const res = await fetch(`/api/presupuestos/${id}/preparar-correo`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.details || data.error || 'Error al enviar');
+        throw new Error(data.details || data.error || 'Error al preparar el correo');
       }
-      triggerToast('✅ ¡Correo enviado con éxito!');
+      
+      // Abrir Gmail Web
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(data.to)}&su=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}`;
+      window.open(gmailUrl, '_blank');
+
+      triggerToast('📬 Redirigiendo a Gmail y marcado como enviado.');
       onRefresh();
     } catch (err: any) {
       alert(`Error: ${err.message}`);

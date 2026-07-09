@@ -289,7 +289,10 @@ app.post('/api/presupuestos', async (req, res) => {
          monto = EXCLUDED.monto,
          estado = EXCLUDED.estado,
          fecha_creacion = EXCLUDED.fecha_creacion,
-         estado_visual = EXCLUDED.estado_visual`,
+         estado_visual = EXCLUDED.estado_visual,
+         email_enviado = 0,
+         fecha_seguimiento_enviado = NULL,
+         error_seguimiento = NULL`,
       [id, cleanCliente, email, cleanFecha, cleanDocumento, cleanMonto, fechaCreacion]
     );
 
@@ -384,6 +387,58 @@ app.post('/api/presupuestos/:id/reenviar', async (req, res) => {
   } catch (error: any) {
     console.error(error);
     return res.status(500).json({ error: 'Error interno.', details: error.message });
+  }
+});
+
+app.post('/api/presupuestos/:id/preparar-correo', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Obtener presupuesto
+    const { rows } = await vercelDb.query('SELECT * FROM presupuestos WHERE id = $1', [id]);
+    const budget = rows[0];
+    if (!budget) {
+      return res.status(404).json({ error: 'Presupuesto no encontrado.' });
+    }
+
+    // 2. Obtener configuración de correo
+    const { rows: configRows } = await vercelDb.query('SELECT key, value FROM configuracion');
+    const config: Record<string, string> = {};
+    configRows.forEach((row) => { config[row.key] = row.value || ''; });
+
+    const subjectTemplate = config['email_subject'] || 'Seguimiento del presupuesto {id} - Alcebo';
+    const plainBodyTemplate = config['email_body'] || '';
+
+    const subject = subjectTemplate
+      .replace(/{id}/g, budget.id)
+      .replace(/{cliente}/g, budget.cliente)
+      .replace(/{documento}/g, budget.documento || '');
+
+    const body = plainBodyTemplate
+      .replace(/{id}/g, budget.id)
+      .replace(/{cliente}/g, budget.cliente)
+      .replace(/{documento}/g, budget.documento || '');
+
+    // 3. Marcar como enviado en la base de datos
+    const timestamp = new Date().toISOString();
+    await vercelDb.query(
+      `UPDATE presupuestos 
+       SET email_enviado = 1, estado_visual = 'Enviado', fecha_seguimiento_enviado = $1, error_seguimiento = NULL 
+       WHERE id = $2`,
+      [timestamp, id]
+    );
+
+    await logSystemEvent('email_enviado', `Preparado reenvío manual (Gmail) para ID ${id}. Marcado como enviado.`);
+
+    return res.json({
+      success: true,
+      to: budget.email,
+      subject,
+      body
+    });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error al preparar el correo.', details: error.message });
   }
 });
 
