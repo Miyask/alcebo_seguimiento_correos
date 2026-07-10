@@ -344,6 +344,22 @@ app.patch('/api/presupuestos/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/presupuestos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await vercelDb.query('SELECT id FROM presupuestos WHERE id = $1', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Presupuesto no encontrado.' });
+    }
+    await vercelDb.query('DELETE FROM presupuestos WHERE id = $1', [id]);
+    await logSystemEvent('db_eliminado', `Presupuesto eliminado: ID ${id}`);
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error al eliminar presupuesto.', details: error.message });
+  }
+});
+
 app.post('/api/presupuestos/:id/reenviar', async (req, res) => {
   try {
     const { id } = req.params;
